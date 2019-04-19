@@ -21,10 +21,9 @@ visualization_msgs::Marker marker_sphere;
 visualization_msgs::Marker marker_arrow;
 
 
-
-std::vector<uint> red = {0, 0, 255, 255, 255, 102, 102, 204, 0, 255};
-std::vector<uint> green = {0, 255, 0, 255, 255, 102, 102, 0, 255, 152};
-std::vector<uint> blue = {255, 0, 0, 0, 255, 152, 52, 152, 255, 52};
+std::vector<float> red = {0, 0, 1, 1, 1, 102.0/255, 102.0/255, 204.0/255, 0, 1};
+std::vector<float> green = {0, 1.0, 0, 1, 1, 102.0/255, 102.0/255, 0, 1, 152.0/255};
+std::vector<float> blue = {1.0, 0, 0, 0, 1, 152.0/255, 52.0/255, 152.0/255, 1, 52.0/255};
 
 
 
@@ -46,11 +45,9 @@ public:
         std::vector<Eigen::Vector4f> msg_centroid_vec;
         std::vector<Eigen::Vector4f> base_centroid_vec;
         //first frame 
-        ROS_WARN("333: %u", base_msg.clusters.size());
-        ROS_WARN("444: %u", msg.clusters.size());
+
         for (int i=0; i < base_msg.clusters.size(); i++)
         {
-            pcl::PointXYZ centroidpoint ;
             pcl::PCLPointCloud2 pc2;
             pcl_conversions::toPCL ( base_msg.clusters[i] , pc2 );
 
@@ -64,7 +61,6 @@ public:
         //second frame
         for (int i=0; i < msg.clusters.size(); i++)
         {
-            pcl::PointXYZ centroidpoint ;
             pcl::PCLPointCloud2 pc2;
             pcl_conversions::toPCL ( msg.clusters[i] , pc2 );
 
@@ -80,8 +76,7 @@ public:
         size_t size_old = base_centroid_vec.size();
         size_t size_new = msg_centroid_vec.size();
 
-        ROS_WARN("1:%u", size_new);
-        ROS_WARN("2:%u", size_old);
+
         unsigned totalsz = size_old + size_new;
         std::vector<std::vector<int> > dists(totalsz, std::vector<int>(totalsz , 10000));// TODO currently, 10000 is the maximum (2d) int distance with a 10 meter laser scanner. Initial value represents a point connected to bottom.
 
@@ -106,10 +101,13 @@ public:
 
         dists = hungarian.assignment();
 
-        marker_arrow.points.erase(marker_arrow.points.begin(), marker_arrow.points.end());
-        marker_sphere.points.erase(marker_sphere.points.begin(), marker_sphere.points.end());
-        marker_sphere.colors.erase(marker_sphere.colors.begin(), marker_sphere.colors.end());
-        marker_arrow.colors.erase(marker_arrow.colors.begin(), marker_arrow.colors.end());
+        
+
+        marker_arrow.points.clear();        
+        marker_sphere.points.clear();
+        marker_sphere.colors.clear();
+        marker_arrow.colors.clear();
+
 
 
         for(unsigned j=0; j < size_new; j++){
@@ -127,8 +125,7 @@ public:
                     c.r = red[mod];
                     c.g = green[mod];
                     c.b=blue[mod];
-
-                    
+                    c.a=0.8;
 
 
                     geometry_msgs::Point p;
@@ -137,8 +134,6 @@ public:
                     p.y = base_centroid_vec[i][1];
                     p.z = base_centroid_vec[i][2];
 
-                    std::cout << "j=" << j << std::endl;
-                    std::cout << "i=" << i << std::endl;
                                        
                     marker_arrow.points.push_back(p);
                     marker_sphere.points.push_back(p);
@@ -149,6 +144,7 @@ public:
                     pp.x = msg_centroid_vec[j][0];
                     pp.y = msg_centroid_vec[j][1];
                     pp.z = msg_centroid_vec[j][2];
+
                    
                     marker_arrow.points.push_back(pp);
                     marker_sphere.points.push_back(pp);
@@ -157,6 +153,10 @@ public:
                     marker_arrow.colors.push_back(c);
                     marker_arrow.colors.push_back(c);
                     marker_sphere.colors.push_back(c);
+
+                    c.a=0.3;
+
+
                     marker_sphere.colors.push_back(c);
 
                     break;
@@ -165,11 +165,10 @@ public:
             msg.cluster_id[j] = msg.cluster_id[j] == -1 ? ++max_id : msg.cluster_id[j];
         }
 
-        // for (unsigned j=0; j < size_new; j++){
-        //     std::cout << "cluster#" << j << ", clusterID:" << msg.cluster_id[j] << std::endl;
-        // }
+        //for (unsigned j=0; j < size_new; j++){
+        // std::cout << "cluster#" << j << ", clusterID:" << msg.cluster_id[j] << std::endl;
+       // }
     }
-
 };
 
 ros::Publisher pub;
@@ -292,6 +291,46 @@ pointcloud_msgs::PointCloud2_Segments clusters_in_overlap (const pointcloud_msgs
 
 void callback (const pointcloud_msgs::PointCloud2_Segments& msg ){
 
+
+
+
+    marker_sphere.ns = "shapeOfsphere";
+    marker_sphere.id = 0;
+    marker_sphere.type = 7;
+    marker_sphere.action = visualization_msgs::Marker::ADD;
+    marker_sphere.pose.orientation.w = 1.0;
+    marker_sphere.color.a = 1.0;
+
+    marker_sphere.scale.x = 0.3;
+    marker_sphere.scale.y = 0.3;
+    marker_sphere.scale.z = 0.3;
+
+    marker_arrow.ns = "shapeOfarrow";
+    marker_arrow.id = 1;    
+    marker_arrow.type = 5;
+    marker_arrow.action = visualization_msgs::Marker::ADD;
+    marker_arrow.pose.orientation.w = 1.0;
+    marker_arrow.color.a = 1.0;
+
+    marker_arrow.scale.x = 0.1;
+    marker_arrow.scale.y = 0.1;
+    marker_arrow.scale.z = 0.1;
+
+
+
+    marker.markers.push_back(marker_sphere);
+    marker.markers.push_back(marker_arrow);
+
+     marker_sphere.header.frame_id = "base_link";
+    marker_sphere.header.stamp = msg.header.stamp;
+    marker_sphere.lifetime = ros::Duration();
+
+
+    marker_arrow.header.frame_id = "base_link";
+    marker_arrow.header.stamp = msg.header.stamp;
+    marker_arrow.lifetime = ros::Duration();
+
+
     double overlap_height_min , overlap_height_max ;
 
     sensor_msgs::PointCloud cloud;
@@ -349,10 +388,6 @@ void callback (const pointcloud_msgs::PointCloud2_Segments& msg ){
                 }
             }
         }
-
-        std::cout << "v[0].clusters-size = " << v_[0].clusters.size()  << std::endl;
-        std::cout << "new_v[0].clusters-size = " << new_v[0].clusters.size()  << std::endl;
-
 
         if (method == 1){
             t = new Centroid_tracking( new_v[0] , max_id );
@@ -429,53 +464,12 @@ void callback (const pointcloud_msgs::PointCloud2_Segments& msg ){
     c_.rec_time = msg.rec_time;
     
 
-
-
-    marker_sphere.ns = "shapeOfsphere";
-    marker_sphere.id = 0;
-    marker_sphere.type = 6;
-    marker_sphere.action = visualization_msgs::Marker::ADD;
-    marker_sphere.pose.orientation.w = 1.0;
-    marker_sphere.color.a = 1.0;
-
-    marker_sphere.scale.x = 0.3;
-    marker_sphere.scale.y = 0.3;
-    marker_sphere.scale.z = 0.3;
-
-    marker_arrow.ns = "shapeOfarrow";
-    marker_arrow.id = 1;    
-    marker_arrow.type = 5;
-    marker_arrow.action = visualization_msgs::Marker::ADD;
-    marker_arrow.pose.orientation.w = 1.0;
-    marker_arrow.color.a = 1.0;
-
-    marker_arrow.scale.x = 0.1;
-    marker_arrow.scale.y = 0.1;
-    marker_arrow.scale.z = 0.1;
-
-
-
-    marker.markers.push_back(marker_sphere);
-    marker.markers.push_back(marker_arrow);
-
-     marker_sphere.header.frame_id = c_.header.frame_id;
-    marker_sphere.header.stamp = c_.header.stamp;
-    marker_sphere.lifetime = ros::Duration();
-
-
-    marker_arrow.header.frame_id = c_.header.frame_id;
-    marker_arrow.header.stamp = c_.header.stamp;
-    marker_arrow.lifetime = ros::Duration();
-
     
     pub.publish(c_);
 
- if ( t != NULL ){
+    if ( t != NULL ) marker_pub.publish(marker);
 
-    marker_pub.publish(marker);
-}
-
-    marker.markers.erase(marker.markers.begin(), marker.markers.end());
+    marker.markers.clear();
 }
 
 
