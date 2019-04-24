@@ -27,26 +27,34 @@ std::vector<float> red = {0, 0, 1, 1, 1, 102.0/255, 102.0/255, 204.0/255, 0, 1};
 std::vector<float> green = {0, 1.0, 0, 1, 1, 102.0/255, 102.0/255, 0, 1, 152.0/255};
 std::vector<float> blue = {1.0, 0, 0, 0, 1, 152.0/255, 52.0/255, 152.0/255, 1, 52.0/255};
 
-std::vector<pointcloud_msgs::PointCloud2_Segments> new_v(2);
-int max_id;
+
+//-------------------------------------------------------------------
 
 
 
 
-    void track () {
+class Centroid_tracking{
+public:
 
+    int max_id ;
 
-        pointcloud_msgs::PointCloud2_Segments base_msg;
-        pointcloud_msgs::PointCloud2_Segments msg;
-        base_msg=new_v[0];
-        msg=new_v[1];
+    pointcloud_msgs::PointCloud2_Segments base_msg;
+
+    Centroid_tracking ( pointcloud_msgs::PointCloud2_Segments& base_msg, int max_id ) 
+    {
+        this->base_msg = base_msg ;
+        this->max_id = max_id ;
+    }
+
+    void track ( pointcloud_msgs::PointCloud2_Segments& msg ) {
 
         std::vector<Eigen::Vector4f> msg_centroid_vec;
         std::vector<Eigen::Vector4f> base_centroid_vec;
-        //first frame 
 
+        //first frame 
         for (int i=0; i < base_msg.clusters.size(); i++)
         {
+            pcl::PointXYZ centroidpoint ;
             pcl::PCLPointCloud2 pc2;
             pcl_conversions::toPCL ( base_msg.clusters[i] , pc2 );
 
@@ -57,13 +65,16 @@ int max_id;
             pcl::compute3DCentroid ( cloud2 , base_centroid);
             base_centroid_vec.push_back( base_centroid );
 
-            std::cout << "base_centroid_vec= " << base_centroid_vec[i] << std::endl;
+          //  std::cout << "base_centroid_vec= " << base_centroid_vec[i] << std::endl;
         }
-         std::cout << "size of base_centroid_vec= " << base_centroid_vec.size() << std::endl;
          
+     //   std::cout << "size of base_centroid_vec= " << base_centroid_vec.size() << std::endl;
+
+
         //second frame
         for (int i=0; i < msg.clusters.size(); i++)
         {
+            pcl::PointXYZ centroidpoint ;
             pcl::PCLPointCloud2 pc2;
             pcl_conversions::toPCL ( msg.clusters[i] , pc2 );
 
@@ -76,15 +87,10 @@ int max_id;
             msg.cluster_id[i] = -1;
         }
 
-        std::cout <<"size of msg_centroid_vec= " << msg_centroid_vec.size() << std::endl;
-
-
-        //std::cout <<"msg_centroid_vec= " << msg_centroid_vec << std::endl;
+      //  std::cout <<"size of msg_centroid_vec= " << msg_centroid_vec.size() << std::endl;
 
         size_t size_old = base_centroid_vec.size();
         size_t size_new = msg_centroid_vec.size();
-
-
         unsigned totalsz = size_old + size_new;
         std::vector<std::vector<int> > dists(totalsz, std::vector<int>(totalsz , 10000));// TODO currently, 10000 is the maximum (2d) int distance with a 10 meter laser scanner. Initial value represents a point connected to bottom.
 
@@ -166,20 +172,23 @@ int max_id;
                         c.a=0.3;
                         marker_sphere.colors.push_back(c);
                     }
-
                     break;
                 }
             }
             msg.cluster_id[j] = msg.cluster_id[j] == -1 ? ++max_id : msg.cluster_id[j];
         }
 
-
-        new_v[1]=msg;
-
-        //for (unsigned j=0; j < size_new; j++){
-        // std::cout << "cluster#" << j << ", clusterID:" << msg.cluster_id[j] << std::endl;
-       // }
+        // for (unsigned j=0; j < size_new; j++){
+        //     std::cout << "cluster#" << j << ", clusterID:" << msg.cluster_id[j] << std::endl;
+        // }
     }
+
+};
+
+
+
+//------------------------------------------------------------------
+
 
 
 ros::Publisher pub;
@@ -187,12 +196,12 @@ ros::Subscriber sub;
 ros::Publisher marker_pub;
 
 bool b = true;
-int size, method;
+int size, max_id, method;
 double overlap, offset ;
 
 
 std::vector<pointcloud_msgs::PointCloud2_Segments> v_;
-//std::vector<pointcloud_msgs::PointCloud2_Segments> new_v(2);
+std::vector<pointcloud_msgs::PointCloud2_Segments> new_v(2);
 
 
 visualization_msgs::MarkerArray marker;
@@ -354,7 +363,7 @@ void callback (const pointcloud_msgs::PointCloud2_Segments& msg ){
 
     v_.push_back(msg);
 
-   // Centroid_tracking* t;
+    Centroid_tracking* t;
 
     if(v_.size()>3) return;
 
@@ -404,7 +413,7 @@ void callback (const pointcloud_msgs::PointCloud2_Segments& msg ){
                 }
             }
 
-          //  t = new Centroid_tracking( new_v[0] , max_id );
+            t = new Centroid_tracking( new_v[0] , max_id );
         }
         else if (method == 2){
            for (unsigned i=0; i < v_[0].cluster_id.size(); i++){
@@ -413,25 +422,26 @@ void callback (const pointcloud_msgs::PointCloud2_Segments& msg ){
                 }
             }
 
-           // t = new Centroid_tracking( v_[0] , max_id );
+            t = new Centroid_tracking( v_[0] , max_id );
         }
     }
-  //  else {
-    //    t = NULL;
-   // }
+    else {
+        t = NULL;
+    }
 
-    if (b==false){
+    //if (b==false){
+    if(t != NULL) {
         if ( method == 1 ){
-            //t-> track( new_v[1] );
-            track();
+            t-> track( new_v[1] );
+            //track();
 
             for (unsigned i=0; i < new_v[1].cluster_id.size(); i++){
                 v_[1].cluster_id.push_back(new_v[1].cluster_id[i]);
             }
         }
         else if ( method == 2){
-           // t-> track( v_[1]);
-            track();
+            t-> track( v_[1]);
+          //  track();
         }
     }
 
@@ -440,7 +450,7 @@ void callback (const pointcloud_msgs::PointCloud2_Segments& msg ){
     {
         double offset=0.0;
 
-   //     if ( i > 0 ){
+     //     if ( i > 0 ){
      //       offset = ( 1.0 - overlap ) * (double)( ros::Duration( v_[i].first_stamp - v_[0].first_stamp ).toSec()) * (double)( msg.factor );
        // }
       //  else {
