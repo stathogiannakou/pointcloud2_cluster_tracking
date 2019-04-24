@@ -56,10 +56,11 @@ int max_id;
             Eigen::Vector4f base_centroid;
             pcl::compute3DCentroid ( cloud2 , base_centroid);
             base_centroid_vec.push_back( base_centroid );
-            std::cout << "i="<< i << "base_centroid_vec= " << base_centroid_vec[i] << std::endl;
 
-
+            std::cout << "base_centroid_vec= " << base_centroid_vec[i] << std::endl;
         }
+         std::cout << "size of base_centroid_vec= " << base_centroid_vec.size() << std::endl;
+         
         //second frame
         for (int i=0; i < msg.clusters.size(); i++)
         {
@@ -73,8 +74,12 @@ int max_id;
 
             msg_centroid_vec.push_back( base_centroid );
             msg.cluster_id[i] = -1;
-            std::cout << "i="<< i << "msg_centroid_vec= " << msg_centroid_vec[i] << std::endl;
         }
+
+        std::cout <<"size of msg_centroid_vec= " << msg_centroid_vec.size() << std::endl;
+
+
+        //std::cout <<"msg_centroid_vec= " << msg_centroid_vec << std::endl;
 
         size_t size_old = base_centroid_vec.size();
         size_t size_new = msg_centroid_vec.size();
@@ -361,21 +366,19 @@ void callback (const pointcloud_msgs::PointCloud2_Segments& msg ){
     if(v_.size()>=2) {
 
         if ( b ){
-           if ( method == 1 ){
-            //    new_v[0] = clusters_in_overlap(v_[0] , overlap_height_min , overlap_height_max);
-                new_v[0]=v_[0];
-            }
 
             for (unsigned i=0; i < v_[0].clusters.size(); i++){
-                if ( method == 1){
-                    new_v[0].cluster_id.push_back(i);
-                }
                 v_[0].cluster_id.push_back(i);
             }
             b = false;
-        } 
+        }
+
+       
 
         if (method == 1 ){
+
+
+             new_v[0]=v_[0];
 
             new_v[1] = clusters_in_overlap(v_[1] , overlap_height_min , overlap_height_max);
 
@@ -435,14 +438,14 @@ void callback (const pointcloud_msgs::PointCloud2_Segments& msg ){
 
     for (unsigned i=0; i < v_.size(); i++)
     {
-        double offset;
+        double offset=0.0;
 
-        if ( i > 0 ){
-            offset = ( 1.0 - overlap ) * (double)( ros::Duration( v_[i].first_stamp - v_[0].first_stamp ).toSec()) * (double)( msg.factor );
-        }
-        else {
-            offset = 0.0;
-        }
+   //     if ( i > 0 ){
+     //       offset = ( 1.0 - overlap ) * (double)( ros::Duration( v_[i].first_stamp - v_[0].first_stamp ).toSec()) * (double)( msg.factor );
+       // }
+      //  else {
+        //    offset = 0.0;
+      //  }
 
         for (unsigned j=0; j < v_[i].clusters.size(); j++)
         {
