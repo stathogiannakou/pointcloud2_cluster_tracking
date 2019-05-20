@@ -23,7 +23,7 @@ int marker_flag, maxHungDist;
 visualization_msgs::Marker marker_sphere;
 visualization_msgs::Marker marker_line;
 
-std::vector<int> ids;
+std::vector<int> ids, idss;
 std::vector<Eigen::Vector4f> centroids;
 
 std::vector<float> red = {0, 0, 1, 1, 1, 102.0/255, 102.0/255, 204.0/255, 0, 1};
@@ -193,13 +193,7 @@ public:
                     break;
                 }
             }
-            if(trackTheUntracked == true){
-
-                if(msg.cluster_id[j] == -1) untracked_msg.push_back(msg_centroid_vec[j]);
-            }
-            else{
-                msg.cluster_id[j] = msg.cluster_id[j] == -1 ? ++max_id : msg.cluster_id[j];
-            }
+            if(trackTheUntracked == true && msg.cluster_id[j] == -1) untracked_msg.push_back(msg_centroid_vec[j]);
         }
 
  
@@ -272,10 +266,149 @@ public:
                         }           
                     }
                 }
+            }            
+        }
+
+
+        for(int k=1; k<idss.size(); k=k+2){
+            for(int l=0; l<size_new; l++){
+                if(idss[k] == msg.cluster_id[l]){
+                    idss.erase(idss.begin()+k-1, idss.begin()+k);
+                    break;
+                }
             }
-            for(int j=0; j < size_new; j++) {
-                if(msg.cluster_id[j] == -1){
-                    msg.cluster_id[j] = ++max_id;
+        }
+
+
+
+
+        // for(int k=0; k<idss.size(); k=k+2){
+        //     for(int l=0; l<size_new; l++){
+        //         if(idss[k] == msg.cluster_id[l]){
+        //             for(int l=0; l<size_new; l++){
+        //                 if(msg.cluster_id[j] == -1){
+
+        //                 }
+        //             }
+                    
+        //             break;
+        //         }
+        //     }
+        // }
+
+
+
+
+
+
+
+        //-----------------------apostasi <= 40cm------------------------------//
+
+
+        int base_size = base_msg.clusters.size();
+        std::vector<pcl::PointCloud<pcl::PointXYZ>> pcz(base_size);  //pcz contains all points with max z
+
+
+
+        pcl::PCLPointCloud2 pc2;
+        pcl_conversions::toPCL ( base_msg.clusters[0] , pc2 );   //from sensor_msgs::pointcloud2 to pcl::pointcloud2
+
+        pcl::PointCloud<pcl::PointXYZ> pc;
+        pcl::fromPCLPointCloud2 ( pc2 , pc );               //from pcl::pointcloud2 to pcl::pointcloud
+            //pc is clusters[j] in pointcloud format
+
+        double max_z = pc.points[0].z;
+        for (int i=1; i < pc.points.size(); i++){       //find max z of cluster 
+            if(pc.points[i].z > max_z){
+                max_z = pc.points[i].z;
+            }
+        }
+
+        // std::cout << "cluster_id = " << msg.cluster_id[j] << "max_z = " << max_z << std::endl;
+
+
+        for(int i=0; i < pc.points.size(); i++){        //add points with max z to a new pointcloud
+            if(pc.points[i].z == max_z){
+                pcz[0].push_back(pc.points[i]);
+            }
+        }
+
+
+        for(unsigned j=0; j < base_msg.clusters.size()-1; j++){
+            for(unsigned i=j+1; i < base_msg.clusters.size(); i++){
+
+
+                pcl::PCLPointCloud2 pc3;
+                pcl_conversions::toPCL ( base_msg.clusters[i] , pc3 );   //from sensor_msgs::pointcloud2 to pcl::pointcloud2
+
+                pcl::PointCloud<pcl::PointXYZ> pc4;
+                pcl::fromPCLPointCloud2 ( pc3 , pc4 );               //from pcl::pointcloud2 to pcl::pointcloud
+                //pc is clusters[j] in pointcloud format
+
+                max_z = pc4.points[0].z;
+                for (int k=1; k < pc4.points.size(); k++){       //find max z of cluster 
+                    if(pc4.points[k].z > max_z){
+                        max_z = pc4.points[k].z;
+                    }
+                }
+
+             // std::cout << "cluster_id = " << msg.cluster_id[j] << "max_z = " << max_z << std::endl;
+
+
+                for(int k=0; k < pc4.points.size(); k++){        //add points with max z to a new pointcloud
+                    if(pc4.points[k].z == max_z){
+                        pcz[i].push_back(pc4.points[k]);
+                    }
+                }
+
+                bool dist_less_04 = false;
+
+                for (int k=0; k < pcz[j].points.size(); k++){      //for every point in the cluster, find min y and max y  
+                    for (int n=0; n < pcz[i].points.size(); n++){
+
+                        double disttt = sqrt(pow(pcz[j].points[k].x-pcz[i].points[n].x, 2) + pow(pcz[j].points[k].y-pcz[i].points[n].y, 2) + pow(pcz[j].points[k].z-pcz[i].points[n].z, 2));
+
+                        if(disttt <= 0.4) {
+
+                            bool id1=false;
+                            bool id2 = false;
+                            
+
+                            for(int m=0; m < msg.cluster_id.size(); m++) {
+                                if(msg.cluster_id[m] == base_msg.cluster_id[j]) id1 = true;
+                                if(msg.cluster_id[m] == base_msg.cluster_id[i]) id2 = true;
+
+                                if(id1==true && id2==true) break;
+                            }
+
+                            if(id1==true && id2==false){
+                                idss.push_back(base_msg.cluster_id[j]);
+                                idss.push_back(base_msg.cluster_id[i]);
+                                std::cout << "cluster_id = " << base_msg.cluster_id[j] << "cluster_id = " << base_msg.cluster_id[i] << std::endl;
+                            }
+                            else if(id1==true && id2==false){
+                                idss.push_back(base_msg.cluster_id[i]);
+                                idss.push_back(base_msg.cluster_id[j]);
+                                std::cout << "cluster_id = " << base_msg.cluster_id[i] << "cluster_id = " << base_msg.cluster_id[j] << std::endl;
+                            }
+
+                            dist_less_04 = true;
+                            break;
+                        }
+                    }
+
+                    if(dist_less_04 == true) break;
+                }
+
+
+
+            }
+        }
+
+        for(int j=0; j < size_new; j++) {
+            if(msg.cluster_id[j] == -1){
+                msg.cluster_id[j] = ++max_id;
+                if(trackTheUntracked == true){
                     centroids.push_back(msg_centroid_vec[j]);
                     ids.push_back(max_id);
                 }
