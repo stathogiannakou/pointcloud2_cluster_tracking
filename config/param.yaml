@@ -10,3 +10,4 @@ overlap: 0.2
 marker_flag: 1 # (int)marker_flag=1 : markers activated
 maxHungDist: 800 
 trackTheUntracked: true
+minMotionDist: 80.0

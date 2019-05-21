@@ -19,11 +19,12 @@
 bool first_time = true;
 bool trackTheUntracked;
 int marker_flag, maxHungDist;
+double minMotionDist;
 
 visualization_msgs::Marker marker_sphere;
 visualization_msgs::Marker marker_line;
 
-std::vector<int> ids, idss;
+std::vector<int> ids, idss, numOfpoints;
 std::vector<Eigen::Vector4f> centroids;
 
 std::vector<float> red = {0, 0, 1, 1, 1, 102.0/255, 102.0/255, 204.0/255, 0, 1};
@@ -46,14 +47,15 @@ public:
 
     void track ( pointcloud_msgs::PointCloud2_Segments& msg ) {
 
+
+        std::cout << "!!" << std::endl;
+
         std::vector<Eigen::Vector4f> msg_centroid_vec;
         std::vector<Eigen::Vector4f> base_centroid_vec;
 
-        std::vector<bool> trackedOrnotIds;
-        std::vector<Eigen::Vector4f> untracked_centr;
-        std::vector<Eigen::Vector4f> untracked_msg;
-        
-
+        std::vector<bool> trackedOrnotIds, clusterInMotion;
+        std::vector<Eigen::Vector4f> untracked_centr, untracked_msg;
+       
 
         //first frame 
         for (int i=0; i < base_msg.clusters.size(); i++)
@@ -104,6 +106,9 @@ public:
 
 
         for(unsigned i=0; i < size_old; i++){
+
+            clusterInMotion.push_back(false);
+
             for(unsigned j=0; j < size_new; j++){
                     dists[i][j] = 1000 * sqrt(pow(base_centroid_vec[i][0]-msg_centroid_vec[j][0], 2) + pow(base_centroid_vec[i][1]-msg_centroid_vec[j][1], 2));                 
             }
@@ -134,6 +139,11 @@ public:
 
                     if (dist<maxHungDist) {
                         msg.cluster_id[j] = base_msg.cluster_id[i];
+
+                       // if(dist>=minMotionDist && base_msg.cluster_id[i]!=6 )
+
+                        //std::cout << "cluster_id = " << base_msg.cluster_id[i] << "dist = " << dist << std::endl;
+
 
                         if(trackTheUntracked == true){
 
@@ -270,16 +280,60 @@ public:
         }
 
 
+
+
+
         for(int k=1; k<idss.size(); k=k+2){
-            for(int l=0; l<size_new; l++){
-                if(idss[k] == msg.cluster_id[l]){
-                    idss.erase(idss.begin()+k-1, idss.begin()+k);
+            for(int l=0; l<size_old; l++){
+                if(idss[k] == base_msg.cluster_id[l]){
+                    bool flag=false;
+                    for(int m=0; m<size_new; m++){
+                        if(idss[k] == msg.cluster_id[m]){
+                            flag=true;
+                            break;
+                        }
+                    }
+                    if(flag==false){
+                        pcl::PCLPointCloud2 pc0;
+                        pcl_conversions::toPCL ( base_msg.clusters[l] , pc0 );   //from sensor_msgs::pointcloud2 to pcl::pointcloud2
+
+                        pcl::PointCloud<pcl::PointXYZ> pc1;
+                        pcl::fromPCLPointCloud2 ( pc0 , pc1 );               //from pcl::pointcloud2 to pcl::pointcloud
+                        //pc is clusters[j] in pointcloud format
+
+                        std::cout << "Mpike stin prwti if" << std::endl;
+
+                        if(pc1.points.size()<numOfpoints[k]/2){
+                            std::cout << "Mpike stin if" << std::endl;
+                            for(int j=0; j<size_new; j++){
+                        
+                                if(msg.cluster_id[j] == -1){
+                                    std::cout << "Mpike!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1!!" << std::endl;
+                                    msg.cluster_id[j]=idss[k];
+                                    if(trackTheUntracked == true){
+
+                                        for (unsigned m=0; m<ids.size(); m++){
+
+                                            if(ids[m] == msg.cluster_id[j]){
+
+                                                centroids[m]=msg_centroid_vec[j];
+                                                trackedOrnotIds[m] = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    idss.erase(idss.begin()+k-1, idss.begin()+k);
+                                    numOfpoints.erase(numOfpoints.begin()+k-1, numOfpoints.begin()+k);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    
                     break;
                 }
             }
         }
-
-
 
 
         // for(int k=0; k<idss.size(); k=k+2){
@@ -297,12 +351,10 @@ public:
         // }
 
 
-
-
-
-
-
         //-----------------------apostasi <= 40cm------------------------------//
+
+
+        std::vector<int> totalnumOfpoints ;
 
 
         int base_size = base_msg.clusters.size();
@@ -317,6 +369,7 @@ public:
         pcl::fromPCLPointCloud2 ( pc2 , pc );               //from pcl::pointcloud2 to pcl::pointcloud
             //pc is clusters[j] in pointcloud format
 
+        totalnumOfpoints.push_back(pc.points.size());
         double max_z = pc.points[0].z;
         for (int i=1; i < pc.points.size(); i++){       //find max z of cluster 
             if(pc.points[i].z > max_z){
@@ -345,6 +398,7 @@ public:
                 pcl::fromPCLPointCloud2 ( pc3 , pc4 );               //from pcl::pointcloud2 to pcl::pointcloud
                 //pc is clusters[j] in pointcloud format
 
+                totalnumOfpoints.push_back(pc4.points.size());
                 max_z = pc4.points[0].z;
                 for (int k=1; k < pc4.points.size(); k++){       //find max z of cluster 
                     if(pc4.points[k].z > max_z){
@@ -384,11 +438,15 @@ public:
                             if(id1==true && id2==false){
                                 idss.push_back(base_msg.cluster_id[j]);
                                 idss.push_back(base_msg.cluster_id[i]);
+                                numOfpoints.push_back(totalnumOfpoints[j]);
+                                numOfpoints.push_back(totalnumOfpoints[i]);
                                 std::cout << "cluster_id = " << base_msg.cluster_id[j] << "cluster_id = " << base_msg.cluster_id[i] << std::endl;
                             }
                             else if(id1==true && id2==false){
                                 idss.push_back(base_msg.cluster_id[i]);
                                 idss.push_back(base_msg.cluster_id[j]);
+                                numOfpoints.push_back(totalnumOfpoints[i]);
+                                numOfpoints.push_back(totalnumOfpoints[j]);
                                 std::cout << "cluster_id = " << base_msg.cluster_id[i] << "cluster_id = " << base_msg.cluster_id[j] << std::endl;
                             }
 
@@ -407,6 +465,7 @@ public:
 
         for(int j=0; j < size_new; j++) {
             if(msg.cluster_id[j] == -1){
+                std::cout << "untracked!!!!!!! " << std::endl;
                 msg.cluster_id[j] = ++max_id;
                 if(trackTheUntracked == true){
                     centroids.push_back(msg_centroid_vec[j]);
@@ -468,7 +527,6 @@ std::pair<double,double> overlap_range (const pointcloud_msgs::PointCloud2_Segme
                 }
             }
         }
-
         else {
 
             offset = 0.0;
@@ -647,31 +705,34 @@ void callback (const pointcloud_msgs::PointCloud2_Segments& msg ){
 
     for (unsigned i=0; i < v_.size(); i++)
     {
-        double offset;
+        // double offset;
 
-        if ( i > 0 ){
-            offset = ( 1.0 - overlap ) * (double)( ros::Duration( v_[i].first_stamp - v_[0].first_stamp ).toSec()) * (double)( msg.factor );
-        }
+        // if ( i > 0 ){
+        //     offset = ( 1.0 - overlap ) * (double)( ros::Duration( v_[i].first_stamp - v_[0].first_stamp ).toSec()) * (double)( msg.factor );
+        // }
 
-        else {
-            offset = 0.0;
-        }
+        // else {
+        //     offset = 0.0;
+        // }
 
-        for (unsigned j=0; j < v_[i].clusters.size(); j++)
-        {
-            sensor_msgs::PointCloud cloud;
-            sensor_msgs::convertPointCloud2ToPointCloud( v_[i].clusters[j] , cloud );
+        // for (unsigned j=0; j < v_[i].clusters.size(); j++)
+        // {
+        //     sensor_msgs::PointCloud cloud;
+        //     sensor_msgs::convertPointCloud2ToPointCloud( v_[i].clusters[j] , cloud );
 
-            for (unsigned k=0; k < cloud.points.size(); k++){
-                cloud.points[k].z += offset;
-            }
+        //     for (unsigned k=0; k < cloud.points.size(); k++){
+        //         cloud.points[k].z += offset;
+        //     }
 
-            sensor_msgs::PointCloud2 pc2;
-            sensor_msgs::convertPointCloudToPointCloud2( cloud , pc2 );
-            c_.clusters.push_back( pc2 );
-        }
+        //     sensor_msgs::PointCloud2 pc2;
+        //     sensor_msgs::convertPointCloudToPointCloud2( cloud , pc2 );
+        //     c_.clusters.push_back( pc2 );
+        // }
+
+
 
         for (int k=0; k < v_[i].cluster_id.size(); k++){
+            c_.clusters.push_back(v_[i].clusters[k]);
             c_.cluster_id.push_back(v_[i].cluster_id[k]);
         }
     }
@@ -718,6 +779,7 @@ int main(int argc, char** argv){
     n_.param("pointcloud2_cluster_tracking/marker_flag", marker_flag , 0);
     n_.param("pointcloud2_cluster_tracking/maxHungDist", maxHungDist , 1000);
     n_.param("pointcloud2_cluster_tracking/trackTheUntracked", trackTheUntracked , false);
+    n_.param("pointcloud2_cluster_tracking/minMotionDist", minMotionDist , 15.0);
 
     n_.param("pointcloud2_cluster_tracking/out_topic", out_topic , std::string("/pointcloud2_cluster_tracking/clusters"));
     n_.param("pointcloud2_cluster_tracking/input_topic", input_topic , std::string("pointcloud2_clustering/clusters"));
