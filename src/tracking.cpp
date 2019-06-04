@@ -19,7 +19,7 @@
 bool first_time = true;
 bool marker_flag, trackTheUntracked;
 int maxHungDist;
-double minMotionDist;
+double minMotionDist, sameClusterMaxDist;
 
 visualization_msgs::Marker marker_sphere, marker_line;
 
@@ -155,67 +155,66 @@ void checkClustersDistance(pointcloud_msgs::PointCloud2_Segments& base_msg, size
 
     double max_z;
 
-    std::pair<double,double> temp_maxz = minmaxz(base_msg.clusters[0]);
-    max_z = temp_maxz.first;
-    
+    for(int l=0; l<clusterInMotion.size(); l++){
+        for(unsigned j=0; j < base_msg.clusters.size(); j++){
+            if(base_msg.cluster_id[j] == clusterInMotion[l]){
 
-    pcz[0]=saveAllMaxZPoints(base_msg.clusters[0], max_z);
+                std::pair<double,double> temp_maxz = minmaxz(base_msg.clusters[j]);
+                max_z = temp_maxz.first;
+                pcz[j]=saveAllMaxZPoints(base_msg.clusters[j], max_z);
 
+                for(unsigned i=0; i < base_msg.clusters.size(); i++){
+                    if(i!=j){
 
-    for(unsigned j=0; j < base_msg.clusters.size()-1; j++){
-        for(unsigned i=j+1; i < base_msg.clusters.size(); i++){
+                        temp_maxz = minmaxz(base_msg.clusters[i]);
+                        max_z = temp_maxz.first;
 
+                        pcz[i]=saveAllMaxZPoints(base_msg.clusters[i], max_z);
 
-            temp_maxz = minmaxz(base_msg.clusters[i]);
-            max_z = temp_maxz.first;
+                        bool dist_less_04 = false;
 
-            pcz[i]=saveAllMaxZPoints(base_msg.clusters[i], max_z);
+                        for (int k=0; k < pcz[j].points.size(); k++){      //for every point in the cluster, find min y and max y  
+                            for (int n=0; n < pcz[i].points.size(); n++){
 
-            bool dist_less_04 = false;
+                                double dist = sqrt(pow(pcz[j].points[k].x-pcz[i].points[n].x, 2) + pow(pcz[j].points[k].y-pcz[i].points[n].y, 2) + pow(pcz[j].points[k].z-pcz[i].points[n].z, 2));
 
-            for (int k=0; k < pcz[j].points.size(); k++){      //for every point in the cluster, find min y and max y  
-                for (int n=0; n < pcz[i].points.size(); n++){
+                                if(dist <= 0.4) {
 
-                    double dist = sqrt(pow(pcz[j].points[k].x-pcz[i].points[n].x, 2) + pow(pcz[j].points[k].y-pcz[i].points[n].y, 2) + pow(pcz[j].points[k].z-pcz[i].points[n].z, 2));
+                                    bool id1=false;
+                                    bool id2 = false;
+                                        
 
-                    if(dist <= 0.4) {
+                                    for(int m=0; m < msg.cluster_id.size(); m++) {
+                                        if(msg.cluster_id[m] == base_msg.cluster_id[j]) id1 = true;
+                                        if(msg.cluster_id[m] == base_msg.cluster_id[i]) id2 = true;
 
-                        bool id1=false;
-                        bool id2 = false;
-                            
+                                        if(id1==true && id2==true) break;
+                                    }
 
-                        for(int m=0; m < msg.cluster_id.size(); m++) {
-                            if(msg.cluster_id[m] == base_msg.cluster_id[j]) id1 = true;
-                            if(msg.cluster_id[m] == base_msg.cluster_id[i]) id2 = true;
+                                    if(id1==true && id2==false){
+                                        idss.push_back(base_msg.cluster_id[j]);
+                                        idss.push_back(base_msg.cluster_id[i]);
+                                        std::cout << "cluster_id = " << base_msg.cluster_id[j] << "cluster_id = " << base_msg.cluster_id[i] << std::endl;
+                                    }
+                                    else if(id1==true && id2==false){
+                                        idss.push_back(base_msg.cluster_id[i]);
+                                        idss.push_back(base_msg.cluster_id[j]);
+                                        std::cout << "cluster_id = " << base_msg.cluster_id[i] << "cluster_id = " << base_msg.cluster_id[j] << std::endl;
+                                    }
 
-                            if(id1==true && id2==true) break;
+                                    dist_less_04 = true;
+                                     break;
+                                }
+                            }
+
+                            if(dist_less_04 == true) break;
                         }
-
-                        if(id1==true && id2==false){
-                            idss.push_back(base_msg.cluster_id[j]);
-                            idss.push_back(base_msg.cluster_id[i]);
-                            std::cout << "cluster_id = " << base_msg.cluster_id[j] << "cluster_id = " << base_msg.cluster_id[i] << std::endl;
-                        }
-                        else if(id1==true && id2==false){
-                            idss.push_back(base_msg.cluster_id[i]);
-                            idss.push_back(base_msg.cluster_id[j]);
-                            std::cout << "cluster_id = " << base_msg.cluster_id[i] << "cluster_id = " << base_msg.cluster_id[j] << std::endl;
-                        }
-
-                        dist_less_04 = true;
-                         break;
                     }
                 }
-
-                if(dist_less_04 == true) break;
             }
         }
     }
 }
-
-
-
-
 
 
 
@@ -314,7 +313,9 @@ public:
             marker_line.colors.clear();
         }
 
-        double dist;
+        double dist, z_maxnew;
+        std::pair<double,double> z_minmax;
+        bool find_id;
 
         for(unsigned j=0; j < size_new; j++){
             for(unsigned i=0; i < size_old; i++){
@@ -393,6 +394,37 @@ public:
         //--------------------------try to track the untracked clusters----------------------------//
 
         if(trackTheUntracked == true) trackUntrackedClusters(untracked_msg, msg, msg_centroid_vec, size_new );
+
+        //----------------------------same cluster max dist---------------------------------------//
+
+        for(int i=0; i<size_new; i++){
+            if(msg.cluster_id[i] == -1){
+                for (int j = 0; j < size_new; j++){
+                    if( msg.cluster_id[j] != -1){
+                        
+                        dist = 1000 * sqrt(pow(msg_centroid_vec[i][0]-msg_centroid_vec[j][0], 2) + pow(msg_centroid_vec[i][1]-msg_centroid_vec[j][1], 2));
+                        if(dist<sameClusterMaxDist){
+                            msg.cluster_id[i] = msg.cluster_id[j];
+                            if(trackTheUntracked == true){
+                                for(int n=0; n<ids.size(); n++){
+                                    if(ids[n] == msg.cluster_id[i]){
+                                        centroids[n] = msg_centroid_vec[i];
+                                        break;
+                                    }
+                                }
+                            }
+
+                            std::cout << "Mpike!!!! cluster_id = " << msg.cluster_id[j] << std::endl;
+                            break;
+
+                        }
+
+                    }
+                }
+            }
+
+
+        }
 
 
 
@@ -473,13 +505,10 @@ public:
 
 
         //----------------------------------probability for extiction------------------------------------------------------------------//
-        bool find_id;
-        std::pair<double,double> z_minmax; 
-
+        
+         
         for(int k=0; k<clusterInMotion.size(); k++ ) {
-
-            double z_maxnew;
-           
+         
             for(int j=0; j < size_new; j++) {
                 if(clusterInMotion[k] == msg.cluster_id[j]){
                    // std::cout << "Innnn for cluster_id = " << msg.cluster_id[j] << std::endl;
@@ -534,6 +563,22 @@ public:
             }
         }
 
+
+        //---------------------------------------------------------------------------------------------//
+
+
+
+        for(int i=1; i<idss.size(); i+=2){
+            for(int j=0; j<size_new; j++){
+                if(idss[i]==msg.cluster_id[j]){
+                    idss.erase(idss.begin()+i-1, idss.begin()+i);
+
+                }
+            }
+        }
+
+
+
         //------------------------------check for cluster in movement---------------------------------//
 
         for(unsigned j=0; j < size_new; j++){
@@ -547,32 +592,43 @@ public:
             }
             if(already_exist==false){ 
 
-                pcl::PointCloud<pcl::PointXYZ> pczmax;       //pcz contains all points with max z
-                pcl::PointCloud<pcl::PointXYZ> pczmin;
+                find_id=false;
 
-                double max_z, min_z;
+                for(int i=0; i<idss.size(); i+=2){
+                    if (idss[i]== msg.cluster_id[j]){
+                        find_id=true;
+                        break;
+                    }
+                }
+                if(find_id==false){
 
-                z_minmax = minmaxz(msg.clusters[j]);
-                max_z = z_minmax.first;
-                min_z = z_minmax.second;
+                    pcl::PointCloud<pcl::PointXYZ> pczmax;       //pcz contains all points with max z
+                    pcl::PointCloud<pcl::PointXYZ> pczmin;
 
-                pczmax=saveAllMaxZPoints(msg.clusters[j], max_z);
-                pczmin=saveAllMaxZPoints(msg.clusters[j], min_z);
+                    double max_z, min_z;
 
-                Eigen::Vector4f max_centroid;
-                pcl::compute3DCentroid ( pczmax , max_centroid);
+                    z_minmax = minmaxz(msg.clusters[j]);
+                    max_z = z_minmax.first;
+                    min_z = z_minmax.second;
 
-                Eigen::Vector4f min_centroid;
-                pcl::compute3DCentroid ( pczmin , min_centroid);
+                    pczmax=saveAllMaxZPoints(msg.clusters[j], max_z);
+                    pczmin=saveAllMaxZPoints(msg.clusters[j], min_z);
 
-                double disttt;
+                    Eigen::Vector4f max_centroid;
+                    pcl::compute3DCentroid ( pczmax , max_centroid);
 
-                disttt = 1000 * sqrt(pow(max_centroid[0]-min_centroid[0], 2) + pow(max_centroid[1]-min_centroid[1], 2));
-                if(disttt > minMotionDist){
-                    clusterInMotion.push_back(msg.cluster_id[j]);
-                    prob_extinction.push_back(false);
-                
-                    std::cout << "cluster_id = " << msg.cluster_id[j] << "dist = " << disttt << std::endl;
+                    Eigen::Vector4f min_centroid;
+                    pcl::compute3DCentroid ( pczmin , min_centroid);
+
+                    double disttt;
+
+                    disttt = 1000 * sqrt(pow(max_centroid[0]-min_centroid[0], 2) + pow(max_centroid[1]-min_centroid[1], 2));
+                    if(disttt > minMotionDist){
+                        clusterInMotion.push_back(msg.cluster_id[j]);
+                        prob_extinction.push_back(false);
+                    
+                        std::cout << "cluster_id = " << msg.cluster_id[j] << "dist = " << disttt << std::endl;
+                    }
                 }
             }
         }
@@ -887,6 +943,7 @@ int main(int argc, char** argv){
     n_.param("pointcloud2_cluster_tracking/maxHungDist", maxHungDist , 1000);
     n_.param("pointcloud2_cluster_tracking/trackTheUntracked", trackTheUntracked , false);
     n_.param("pointcloud2_cluster_tracking/minMotionDist", minMotionDist , 15.0);
+    n_.param("pointcloud2_cluster_tracking/sameClusterMaxDist", sameClusterMaxDist , 0.0);
 
     n_.param("pointcloud2_cluster_tracking/out_topic", out_topic , std::string("/pointcloud2_cluster_tracking/clusters"));
     n_.param("pointcloud2_cluster_tracking/input_topic", input_topic , std::string("pointcloud2_clustering/clusters"));
