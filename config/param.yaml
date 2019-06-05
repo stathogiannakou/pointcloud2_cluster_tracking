@@ -12,3 +12,4 @@ maxHungDist: 800
 trackTheUntracked: true
 minMotionDist: 1000.0
 sameClusterMaxDist: 500.0
+max_dist: 0.5   # when two clusters are closer from max_dist (meters)
