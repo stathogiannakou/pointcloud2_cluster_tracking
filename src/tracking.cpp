@@ -19,15 +19,13 @@
 bool first_time = true;
 bool marker_flag, trackTheUntracked;
 int maxHungDist;
-double minMotionDist, sameClusterMaxDist, max_dist;
+double minMotionDist, max_dist;
 
 visualization_msgs::Marker marker_sphere, marker_line;
 
 std::vector<int> ids, idss, clusterInMotion;
 std::vector<bool> prob_extinction,trackedOrnotIds;;
 std::vector<Eigen::Vector4f> centroids;
-
-
 
 
 std::vector<float> red = {0, 0, 1, 1, 1, 102.0/255, 102.0/255, 204.0/255, 0, 1};
@@ -264,7 +262,7 @@ void checkClustersDistance(pointcloud_msgs::PointCloud2_Segments base_msg, size_
 
 
 
-bool checkformotion(pcl::PointCloud<pcl::PointXYZ> pcz_max, pcl::PointCloud<pcl::PointXYZ> pcz_min ){
+bool checkforsameXYpoints(pcl::PointCloud<pcl::PointXYZ> pcz_max, pcl::PointCloud<pcl::PointXYZ> pcz_min ){
 
    
     double xmin,xmax, ymin, ymax;
@@ -290,15 +288,15 @@ bool checkformotion(pcl::PointCloud<pcl::PointXYZ> pcz_max, pcl::PointCloud<pcl:
     }
 
 
-    bool motion=true;
+    bool same=false;
 
     for(int k=0; k < pcz_max.points.size(); k++){        
         if(pcz_max.points[k].x >= xmin && pcz_max.points[k].x <= xmax && pcz_max.points[k].y >= ymin && pcz_max.points[k].y <= ymax){
-            motion=false;
+            same=true;
             break;
         }
     }
-    return motion;
+    return same;
 }
 
 
@@ -482,16 +480,25 @@ public:
 
         if(trackTheUntracked == true) trackUntrackedClusters(untracked_msg, msg, msg_centroid_vec, size_new );
 
-        //----------------------------same cluster max dist---------------------------------------//
+        //----------------------------same cluster ---------------------------------------//
 
         for(int i=0; i<size_new; i++){
             if(msg.cluster_id[i] == -1){
+
+                pcl::PointCloud<pcl::PointXYZ> pc_untracked;
+                pc_untracked=saveAllPoints(msg.clusters[i]);
+
                 for (int j = 0; j < size_new; j++){
                     if( msg.cluster_id[j] != -1){
-                        
-                        dist = 1000 * sqrt(pow(msg_centroid_vec[i][0]-msg_centroid_vec[j][0], 2) + pow(msg_centroid_vec[i][1]-msg_centroid_vec[j][1], 2));
-                        if(dist<sameClusterMaxDist){
+
+                        pcl::PointCloud<pcl::PointXYZ> pc_existCluster;
+                        pc_existCluster=saveAllPoints(msg.clusters[j]);
+
+                       double same_cluster = checkforsameXYpoints(pc_existCluster, pc_untracked);
+                       if(same_cluster==true){
+
                             msg.cluster_id[i] = msg.cluster_id[j];
+
                             if(trackTheUntracked == true){
                                 for(int n=0; n<ids.size(); n++){
                                     if(ids[n] == msg.cluster_id[i]){
@@ -502,7 +509,7 @@ public:
                             }
 
                             std::cout << "Mpike!!!! cluster_id = " << msg.cluster_id[j] << std::endl;
-                            break;
+                            break;    
                         }
                     }
                 }
@@ -699,8 +706,6 @@ public:
                     max_z = z_minmax.first;
                     min_z = z_minmax.second;
 
-                    
-
 
                     pczmax=saveAllZValuePoints(msg.clusters[j], max_z);
                     pczmin=saveAllZValuePoints(msg.clusters[j], min_z);
@@ -717,22 +722,16 @@ public:
                     if(disttt > minMotionDist){
 
                         pczmax=saveAllZPointsFrom(msg.clusters[j], (max_z + msg.middle_z)/2);
-                        pczmin=saveAllZPointsUntil(msg.clusters[j], (min_z + msg.middle_z)/2);
-                       double motion= checkformotion(pczmax, pczmin);
-                       if(motion==true){
+                        pczmin=saveAllZPointsUntil(msg.clusters[j],  (min_z + msg.middle_z)/2);
+                       double samepoints= checkforsameXYpoints(pczmax, pczmin);
+                       std::cout << "pczmin = " << pczmin << std::endl;
+                            std::cout << "pczmax = " << pczmax << std::endl;
+                       if(samepoints==false){
 
-                            // pczmax=saveAllZValuePoints(msg.clusters[j], msg.middle_z);
-                            // motion= checkformotion(pczmax, pczmin);
-                            // if (motion==true){
-
-                                std::cout << "pczmin = " << pczmin << std::endl;
-                                std::cout << "pczmax = " << pczmax << std::endl;
-                        
-                                clusterInMotion.push_back(msg.cluster_id[j]);
-                                prob_extinction.push_back(false);
+                            clusterInMotion.push_back(msg.cluster_id[j]);
+                            prob_extinction.push_back(false);
                             
-                                std::cout << "cluster_id = " << msg.cluster_id[j] << "dist = " << disttt << std::endl;
-                            // }
+                            std::cout << "cluster_id = " << msg.cluster_id[j] << "dist = " << disttt << std::endl;    
                         }
                     }
                 }
@@ -743,6 +742,9 @@ public:
        //---------------------------------------------------------------------------------------------//
     }
 };
+
+
+
 
 ros::Publisher pub;
 ros::Subscriber sub;
@@ -1050,7 +1052,6 @@ int main(int argc, char** argv){
     n_.param("pointcloud2_cluster_tracking/maxHungDist", maxHungDist , 1000);
     n_.param("pointcloud2_cluster_tracking/trackTheUntracked", trackTheUntracked , false);
     n_.param("pointcloud2_cluster_tracking/minMotionDist", minMotionDist , 15.0);
-    n_.param("pointcloud2_cluster_tracking/sameClusterMaxDist", sameClusterMaxDist , 0.0);
     n_.param("pointcloud2_cluster_tracking/max_dist", max_dist , 0.0);
 
     n_.param("pointcloud2_cluster_tracking/out_topic", out_topic , std::string("/pointcloud2_cluster_tracking/clusters"));
