@@ -23,15 +23,16 @@ double minMotionDist, max_dist;
 
 visualization_msgs::Marker marker_sphere, marker_line;
 
-std::vector<int> ids, idss, clusterInMotion;
+std::vector<int> ids, idss, clusterInMotion, idsforminmaxPoints;
 std::vector<bool> prob_extinction,trackedOrnotIds;;
 std::vector<Eigen::Vector4f> centroids;
+
+std::vector<double> minmaxPointsOfClusters;
 
 
 std::vector<float> red = {0, 0, 1, 1, 1, 102.0/255, 102.0/255, 204.0/255, 0, 1};
 std::vector<float> green = {0, 1.0, 0, 1, 1, 102.0/255, 102.0/255, 0, 1, 152.0/255};
 std::vector<float> blue = {1.0, 0, 0, 0, 1, 152.0/255, 52.0/255, 152.0/255, 1, 52.0/255};
-
 
 
 std::pair<double,double> minmaxz (sensor_msgs::PointCloud2 clust){
@@ -119,7 +120,6 @@ pcl::PointCloud<pcl::PointXYZ> saveAllZPointsUntil(sensor_msgs::PointCloud2 clus
 
     return pcz3;
 }
-
 
 
 void trackUntrackedClusters(std::vector<Eigen::Vector4f> untracked_msg, pointcloud_msgs::PointCloud2_Segments& msg, std::vector<Eigen::Vector4f> msg_centroid_vec, size_t size_new  ){
@@ -267,8 +267,7 @@ void checkClustersDistance(pointcloud_msgs::PointCloud2_Segments base_msg, size_
 }
 
 
-
-bool checkforsameXYpoints(pcl::PointCloud<pcl::PointXYZ> pcz_max, pcl::PointCloud<pcl::PointXYZ> pcz_min ){
+bool checkforsameXYpoints(pcl::PointCloud<pcl::PointXYZ> pcz_max, pcl::PointCloud<pcl::PointXYZ> pcz_min){
 
    
     double xmin,xmax, ymin, ymax;
@@ -373,6 +372,74 @@ void checkIfClusterMove(pointcloud_msgs::PointCloud2_Segments msg, size_t size_n
     }
 }
 
+void initialazationOfMinMaxVector(sensor_msgs::PointCloud2 clust, int id){
+    pcl::PointCloud<pcl::PointXYZ> pcz;
+    pcz=saveAllPoints(clust);
+
+    double xmin,xmax, ymin, ymax;
+
+    xmin= pcz.points[0].x;
+    xmax= pcz.points[0].x;
+    ymin= pcz.points[0].y;
+    ymax= pcz.points[0].y;
+
+    for(int k=1; k < pcz.points.size(); k++){        
+        if(pcz.points[k].x < xmin){
+            xmin= pcz.points[k].x;
+        }
+        if(pcz.points[k].x > xmax){
+            xmax= pcz.points[k].x;
+        }
+        if(pcz.points[k].y < ymin){
+            ymin= pcz.points[k].y;
+        }
+        if(pcz.points[k].y > ymax){
+            ymax= pcz.points[k].y;
+        }
+    }
+    minmaxPointsOfClusters.push_back(xmin);
+    minmaxPointsOfClusters.push_back(xmax);
+    minmaxPointsOfClusters.push_back(ymin);
+    minmaxPointsOfClusters.push_back(ymax);
+    idsforminmaxPoints.push_back(id);
+
+}
+
+void perimeterOfClusters(pointcloud_msgs::PointCloud2_Segments msg, size_t size_new){
+    for(int i=0; i<size_new; i++){
+        for(int j=0; j<idsforminmaxPoints; j++){
+            if(msg.cluster_id[i]==idsforminmaxPoints[j]){
+
+                pcl::PointCloud<pcl::PointXYZ> pcz;
+
+                double max_z;
+                std::pair<double,double> z_minmax;
+
+                z_minmax = minmaxz(msg.clusters[i]);
+                max_z = z_minmax.first;
+
+                pcz=saveAllZValuePoints(msg.clusters[i], max_z);                
+
+                for(int k=0; k < pcz.points.size(); k++){        
+                    if(pcz.points[k].x < minmaxPointsOfClusters[4*j]){
+                        minmaxPointsOfClusters[4*j]= pcz.points[k].x;
+                    }
+                    if(pcz.points[k].x > minmaxPointsOfClusters[4*j+1]){
+                        minmaxPointsOfClusters[4*j+1]= pcz.points[k].x;
+                    }
+                    if(pcz.points[k].y < minmaxPointsOfClusters[4*j+2]){
+                        minmaxPointsOfClusters[4*j+2]= pcz.points[k].y;
+                    }
+                    if(pcz.points[k].y > minmaxPointsOfClusters[4*j+3]){
+                        minmaxPointsOfClusters[4*j+3]= pcz.points[k].y;
+                    }
+                }
+                break;
+            }
+        }
+    }
+}
+
 
 
 class Centroid_tracking{
@@ -418,6 +485,8 @@ public:
             Eigen::Vector4f base_centroid;
             pcl::compute3DCentroid ( cloud2 , base_centroid);
             base_centroid_vec.push_back( base_centroid );
+
+            if(first_time==true) initialazationOfMinMaxVector(base_msg.clusters[i], i);
 
             if(first_time==true && trackTheUntracked == true){
                 centroids.push_back(base_centroid);
