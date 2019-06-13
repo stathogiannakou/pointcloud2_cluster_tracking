@@ -15,6 +15,9 @@
 #include <pointcloud_msgs/PointCloud2_Segments.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <visualization_msgs/Marker.h>
+#include <algorithm>    // std::find
+#include <vector>       // std::vector
+
 
 bool first_time = true;
 bool marker_flag, trackTheUntracked;
@@ -402,7 +405,6 @@ void initialazationOfMinMaxVector(sensor_msgs::PointCloud2 clust, int id){
     minmaxPointsOfClusters.push_back(ymin);
     minmaxPointsOfClusters.push_back(ymax);
     idsforminmaxPoints.push_back(id);
-
 }
 
 void perimeterOfClusters(pointcloud_msgs::PointCloud2_Segments msg, size_t size_new){
@@ -439,6 +441,46 @@ void perimeterOfClusters(pointcloud_msgs::PointCloud2_Segments msg, size_t size_
         }
     }
 }
+
+void clusterInsideToOther(){
+
+    pcl::PointCloud<pcl::PointXYZ> pcz; 
+    double max_z;
+    bool inside;
+
+    for(int i=0; i<size_new; i++){
+        std::pair<double,double> temp_maxz = minmaxz(msg.clusters[i]);
+        max_z = temp_maxz.first;
+
+        pcz=saveAllZPointsFrom(msg.clusters[i], (max_z + base_msg.middle_z)/2);
+
+        for(int j=0; j<idsforminmaxPoints; j++){
+
+            inside=false;
+
+            for(k=0; k<pcz.points.size(); k++){
+                if(pcz.points[k].x >= minmaxPointsOfClusters[4*j] && pcz.points[k].x <= minmaxPointsOfClusters[4*j+1] && pcz.points[k].y >= minmaxPointsOfClusters[4*j+2] && pcz.points[k].y <= minmaxPointsOfClusters[4*j+3]){
+                    inside=true;
+                    break;
+                }
+            }
+            if(inside==true && msg.cluster_id[i]!=idsforminmaxPoints[j]){
+
+                
+
+                std::vector<int>::iterator it;
+
+                it = find (clusterInMotion.begin(), clusterInMotion.end(), msg.cluster_id[i]);
+                if (it != myvector.end())
+                    msg.cluster_id[i]==idsforminmaxPoints[j];
+                else
+                    std::cout << "Element not found in myvector\n";
+            }
+            else if(inside){
+            }
+        }
+    } 
+} 
 
 
 
