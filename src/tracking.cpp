@@ -18,7 +18,6 @@
 #include <algorithm>    // std::find
 #include <vector>       // std::vector
 
-
 bool first_time = true;
 bool marker_flag, trackTheUntracked;
 int maxHungDist;
@@ -83,7 +82,6 @@ pcl::PointCloud<pcl::PointXYZ> saveAllZValuePoints(sensor_msgs::PointCloud2 clus
             pcz3.push_back(pc.points[i]);
         }
     }
-
     return pcz3;
 }
 
@@ -390,12 +388,25 @@ public:
         //first frame 
         for (int i=0; i < base_msg.clusters.size(); i++)
         {
+
             pcl::PointXYZ centroidpoint ;
             pcl::PCLPointCloud2 pc2;
             pcl_conversions::toPCL ( base_msg.clusters[i] , pc2 );
 
             pcl::PointCloud<pcl::PointXYZ> cloud2;
             pcl::fromPCLPointCloud2 ( pc2 , cloud2 );
+
+
+
+            // double max_z, min_z;
+            // std::pair<double,double> z_minmax;
+
+            // z_minmax = minmaxz(base_msg.clusters[i]);
+            // max_z = z_minmax.first;
+            // min_z = z_minmax.second;
+            // std::cout << "ID = " << base_msg.cluster_id[i] << "  max_z = " << max_z << "  min_z = " << min_z << "  NumOfPoints = " << cloud2.points.size() << std::endl;
+
+            
 
             Eigen::Vector4f base_centroid;
             pcl::compute3DCentroid ( cloud2 , base_centroid);
@@ -521,6 +532,8 @@ public:
 
         if(trackTheUntracked == true) trackUntrackedClusters(untracked_msg, msg, msg_centroid_vec, size_new );
 
+
+
         //----------------------------same cluster ---------------------------------------// check whether there is a new cluster over an existing one or not 
 
         for(int i=0; i<size_new; i++){
@@ -567,57 +580,57 @@ public:
         //----------------------------------probability for extiction------------------------------------------------------------------// check clusters which is in motion if their maxz is less than 1.5*(regular)middlez  
         
          
-        for(int k=0; k<clusterInMotion.size(); k++ ) {
-            for(int j=0; j < size_new; j++) {
-                if(clusterInMotion[k] == msg.cluster_id[j]){
-                    z_minmax = minmaxz(msg.clusters[j]);
-                    z_maxnew = z_minmax.first;
-                    if(z_maxnew< 3*msg.middle_z/2) prob_extinction[k]=true;
-                    else prob_extinction[k]=false;
-                    break;    
-                }
-            }     
-        }
+        // for(int k=0; k<clusterInMotion.size(); k++ ) {
+        //     for(int j=0; j < size_new; j++) {
+        //         if(clusterInMotion[k] == msg.cluster_id[j]){
+        //             z_minmax = minmaxz(msg.clusters[j]);
+        //             z_maxnew = z_minmax.first;
+        //             if(z_maxnew< 3*msg.middle_z/2) prob_extinction[k]=true;
+        //             else prob_extinction[k]=false;
+        //             break;    
+        //         }
+        //     }     
+        // }
 
         //-------------------------------------check for new cluster------------------------------------------------------------//
 
         for(int j=0; j < size_new; j++) {
-            if(msg.cluster_id[j] == -1){
-                std::cout << "untracked!!!!!!! " << std::endl;
+            // if(msg.cluster_id[j] == -1){
+            //     std::cout << "untracked!!!!!!! " << std::endl;
 
-                for(int k=0; k<clusterInMotion.size(); k++ ) {  
-                    find_id=false;
-                    for(int i=0; i < size_new; i++) {
-                        if(clusterInMotion[k] == msg.cluster_id[i]){
-                            find_id=true;
-                            if(prob_extinction[k] == true) find_id=false;
+            //     for(int k=0; k<clusterInMotion.size(); k++ ) {  
+            //         find_id=false;
+            //         for(int i=0; i < size_new; i++) {
+            //             if(clusterInMotion[k] == msg.cluster_id[i]){
+            //                 find_id=true;
+            //                 if(prob_extinction[k] == true) find_id=false;
 
-                            break;
-                        }
-                    }
-                    if(find_id==false){    // image check needed!!
-                        msg.cluster_id[j] = clusterInMotion[k];
-                        prob_extinction[k]=false;
-                        if(trackTheUntracked == true){
-                            for(int n=0; n<ids.size(); n++){
-                                if(ids[n] == clusterInMotion[k]){
-                                    centroids[n] = msg_centroid_vec[j];
-                                    break;
-                                }
-                            }
-                        }
-                        break;
-                    }
-                }
+            //                 break;
+            //             }
+            //         }
+            //         if(find_id==false){    // image check needed!!
+            //             msg.cluster_id[j] = clusterInMotion[k];
+            //             prob_extinction[k]=false;
+            //             if(trackTheUntracked == true){
+            //                 for(int n=0; n<ids.size(); n++){
+            //                     if(ids[n] == clusterInMotion[k]){
+            //                         centroids[n] = msg_centroid_vec[j];
+            //                         break;
+            //                     }
+            //                 }
+            //             }
+            //             break;
+            //         }
+            //     }
                 if(msg.cluster_id[j] == -1){
-                    std::cout << "New Cluster!!!! " << std::endl;
                     msg.cluster_id[j] = ++max_id;
+                    std::cout << "New Cluster!!!! id = " << msg.cluster_id[j]  << std::endl;
                     if(trackTheUntracked == true){
                         centroids.push_back(msg_centroid_vec[j]);
                         ids.push_back(msg.cluster_id[j]);
                     }
                 }
-            }
+            //}
         }
 
         //---------------------------------------------------------------------------------------------//
@@ -633,7 +646,7 @@ public:
 
         //------------------------------check if cluster is in movement---------------------------------//
 
-        checkIfClusterMove(msg, size_new);
+        //checkIfClusterMove(msg, size_new);
         
         if(clusterInMotion.size()==1) {
             msg.idForTracking=clusterInMotion[0];
@@ -785,8 +798,8 @@ void callback (const pointcloud_msgs::PointCloud2_Segments& msg ){
         marker_line.color.a = 1.0;
 
         marker_line.scale.x = 0.1;
-        marker_line.scale.y = 0.1;
-        marker_line.scale.z = 0.1;
+        // marker_line.scale.y = 0.1;
+        // marker_line.scale.z = 0.1;
 
 
         marker_sphere.header.frame_id = marker_frame_id;
@@ -800,7 +813,6 @@ void callback (const pointcloud_msgs::PointCloud2_Segments& msg ){
         marker.markers.push_back(marker_sphere);
         marker.markers.push_back(marker_line);
     }
-
 
 
     double overlap_height_min , overlap_height_max ;
