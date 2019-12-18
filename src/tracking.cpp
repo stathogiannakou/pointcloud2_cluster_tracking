@@ -670,7 +670,6 @@ std::vector<pointcloud_msgs::PointCloud2_Segments> v_;
 std::vector<pointcloud_msgs::PointCloud2_Segments> new_v(2);
 
 visualization_msgs::MarkerArray marker;
-std::string marker_frame_id;
 
 
 std::pair<double,double> overlap_range (const pointcloud_msgs::PointCloud2_Segments& cls){
@@ -802,11 +801,11 @@ void callback (const pointcloud_msgs::PointCloud2_Segments& msg ){
         // marker_line.scale.z = 0.1;
 
 
-        marker_sphere.header.frame_id = marker_frame_id;
+        marker_sphere.header.frame_id = msg.header.frame_id;
         marker_sphere.header.stamp = msg.header.stamp;
         marker_sphere.lifetime = ros::Duration();
 
-        marker_line.header.frame_id = marker_frame_id;
+        marker_line.header.frame_id = msg.header.frame_id;
         marker_line.header.stamp = msg.header.stamp;
         marker_line.lifetime = ros::Duration();
 
@@ -915,7 +914,7 @@ void callback (const pointcloud_msgs::PointCloud2_Segments& msg ){
     
     pub.publish(c_);
 
-    if(marker_flag==true && t != NULL) {
+    if(marker_flag==true and t != NULL) {
 
         marker_pub.publish(marker);
 
@@ -949,7 +948,6 @@ int main(int argc, char** argv){
     if(marker_flag==true) {
 
         n_.param("pointcloud2_cluster_tracking/marker_topic", marker_topic , std::string("visualization_marker"));
-        n_.param("pointcloud2_cluster_tracking/marker_frame_id", marker_frame_id , std::string("/base_link"));
         marker_pub = n_.advertise<visualization_msgs::MarkerArray>(marker_topic, 1);
     }
 
