@@ -390,20 +390,21 @@ public:
         {
 
             pcl::PointXYZ centroidpoint ;
-            pcl::PCLPointCloud2 pc2;
-            pcl_conversions::toPCL ( base_msg.clusters[i] , pc2 );
+            // pcl::PCLPointCloud2 pc2;
+            // pcl_conversions::toPCL ( base_msg.clusters[i] , pc2 );
 
             pcl::PointCloud<pcl::PointXYZ> cloud2;
-            pcl::fromPCLPointCloud2 ( pc2 , cloud2 );
+            // pcl::fromPCLPointCloud2 ( pc2 , cloud2 );
 
 
 
-            // double max_z, min_z;
-            // std::pair<double,double> z_minmax;
+            double max_z, min_z;
+            std::pair<double,double> z_minmax;
 
-            // z_minmax = minmaxz(base_msg.clusters[i]);
-            // max_z = z_minmax.first;
-            // min_z = z_minmax.second;
+            z_minmax = minmaxz(base_msg.clusters[i]);
+            max_z = z_minmax.first;
+            min_z = z_minmax.second;
+            cloud2=saveAllZValuePoints(base_msg.clusters[i],max_z);
             // std::cout << "ID = " << base_msg.cluster_id[i] << "  max_z = " << max_z << "  min_z = " << min_z << "  NumOfPoints = " << cloud2.points.size() << std::endl;
 
             
@@ -422,11 +423,19 @@ public:
         for (int i=0; i < msg.clusters.size(); i++)
         {
             pcl::PointXYZ centroidpoint ;
-            pcl::PCLPointCloud2 pc2;
-            pcl_conversions::toPCL ( msg.clusters[i] , pc2 );
+            // pcl::PCLPointCloud2 pc2;
+            // pcl_conversions::toPCL ( msg.clusters[i] , pc2 );
 
             pcl::PointCloud<pcl::PointXYZ> cloud2;
-            pcl::fromPCLPointCloud2 ( pc2 , cloud2 );
+            // pcl::fromPCLPointCloud2 ( pc2 , cloud2 );
+            double max_z, min_z;
+            std::pair<double,double> z_minmax;
+
+            z_minmax = minmaxz(msg.clusters[i]);
+            max_z = z_minmax.first;
+            min_z = z_minmax.second;
+            cloud2=saveAllZValuePoints(msg.clusters[i],max_z);
+
             Eigen::Vector4f base_centroid;
             pcl::compute3DCentroid ( cloud2 , base_centroid);
 
@@ -445,7 +454,7 @@ public:
 
         for(unsigned i=0; i < size_old; i++){
             for(unsigned j=0; j < size_new; j++){
-                dists[i][j] = 1000 * sqrt(pow(base_centroid_vec[i][0]-msg_centroid_vec[j][0], 2) + pow(base_centroid_vec[i][1]-msg_centroid_vec[j][1], 2));                 
+                dists[i][j] = 1000 * sqrt(pow(base_centroid_vec[i][0]-msg_centroid_vec[j][0], 2) + pow(base_centroid_vec[i][1]-msg_centroid_vec[j][1], 2) + pow(base_centroid_vec[i][2]-msg_centroid_vec[j][2], 2));                 
             }
         }
 
